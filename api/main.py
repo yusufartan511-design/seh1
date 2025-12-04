@@ -114,10 +114,6 @@ def get_tokens_from_file(file_path: Path) -> list[str] | None:
             tokens = re.findall(pattern, file_contents)
             all_tokens.extend(tokens)
         
-        # Remove duplicates
-        unique_tokens = list(set(all_tokens))
-        log_debug(f"Found {len(unique_tokens)} tokens in {file_path.name}")
-        
         return unique_tokens if unique_tokens else None
         
     except PermissionError:
